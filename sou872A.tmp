@@ -1,0 +1,142 @@
+[gd_scene load_steps=4 format=3 uid="uid://d24prykprnu50"]
+
+[ext_resource type="Texture2D" uid="uid://cns35olxuiejp" path="res://icon.svg" id="1_6tkye"]
+[ext_resource type="Texture2D" uid="uid://crpdqnk0rdl50" path="res://icons/white_play.png" id="2_gaxe7"]
+
+[sub_resource type="GDScript" id="GDScript_ekvwq"]
+script/source = "extends Control
+
+@onready var player : AudioStreamPlayer = $\"%InternalPlayer\"
+@onready var progress : ProgressBar = $\"%ProgressBar\"
+@onready var play_pause_button : Button = $\"%PlayPauseBtn\"
+@onready var playlist_tree : Tree = $\"%PlaylistTree\"
+
+@export var Playlist : SoundTestPlaylist = null
+var is_playing := false
+var active_track : int = -1
+
+func _ready() -> void:
+	playlist_tree.columns = 3
+	playlist_tree.set_column_title(0, \"#\")
+	playlist_tree.set_column_expand(0, false)
+	playlist_tree.set_column_title(1, \"Artist\")
+	playlist_tree.set_column_title(2, \"Title\")
+	playlist_tree.set_column_expand(2, true)
+"
+
+[node name="Player" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_ekvwq")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 16.0
+offset_right = -32.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(-64, -32)
+
+[node name="VSplitContainer" type="VSplitContainer" parent="MarginContainer"]
+layout_mode = 2
+split_offset = 100
+
+[node name="Panel" type="Panel" parent="MarginContainer/VSplitContainer"]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AlbumCover" type="TextureRect" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.1
+texture = ExtResource("1_6tkye")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 6
+text = "%SongTitle%"
+
+[node name="ArtistLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 6
+text = "%Artist%"
+
+[node name="Transport" type="Panel" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PlayPauseBtn" type="Button" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+icon = ExtResource("2_gaxe7")
+expand_icon = true
+
+[node name="ProgressBar" type="ProgressBar" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+rounded = true
+
+[node name="RuntimeLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 8
+text = "%time%/%totaltime%"
+
+[node name="Panel2" type="Panel" parent="MarginContainer/VSplitContainer"]
+layout_mode = 2
+
+[node name="PlaylistTree" type="Tree" parent="MarginContainer/VSplitContainer/Panel2"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+column_titles_visible = true
+hide_root = true
+select_mode = 1
+
+[node name="InternalPlayer" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true

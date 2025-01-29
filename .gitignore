@@ -1,0 +1,10 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+/platform/
+*.ogg
+*.ogg.import
+*.flac
+*.flac.import
+*.mp3
+*.mp3.import

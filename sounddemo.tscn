@@ -1,0 +1,273 @@
+[gd_scene load_steps=5 format=3 uid="uid://d24prykprnu50"]
+
+[ext_resource type="Texture2D" uid="uid://cns35olxuiejp" path="res://icon.svg" id="1_6tkye"]
+[ext_resource type="Resource" uid="uid://7mymsesl5ooi" path="res://basic.playlist.tres" id="1_8max0"]
+[ext_resource type="Texture2D" uid="uid://crpdqnk0rdl50" path="res://icons/white_play.png" id="2_gaxe7"]
+
+[sub_resource type="GDScript" id="GDScript_ekvwq"]
+script/source = "extends Control
+
+@onready var player : AudioStreamPlayer = $\"%InternalPlayer\"
+@onready var progress : ProgressBar = $\"%ProgressBar\"
+@onready var play_pause_button : Button = $\"%PlayPauseBtn\"
+@onready var playlist_tree : Tree = $\"%PlaylistTree\"
+
+@export var playlist : SoundTestPlaylist = null
+var _playlist_root = null
+
+var is_playing : 
+	get():
+		return %InternalPlayer.playing
+
+var active_track : int = -1 :
+	set(p_value):
+		active_track = p_value
+		playback_state_changed.emit(is_playing, active_track)
+
+var compact_mode : bool = false :
+	set(p_value):
+		var changed = compact_mode != p_value
+		compact_mode = p_value
+		if changed:
+			var tween = get_tree().create_tween()
+			if compact_mode:
+				print(self.position)
+				tween.tween_property(self, \"position\", Vector2(0, self.size.y - 144), 0.5)
+				tween.tween_property(playlist_tree.get_parent(), \"modulate\", Color(0.05, 0, 0, 1.0), 0.5)
+			else:
+				tween.set_parallel(true)
+				tween.tween_property(self, \"position\", Vector2(0, 0), 0.5)
+				tween.tween_property(playlist_tree.get_parent(), \"modulate\", Color.WHITE, 0.5)
+
+var _time_since_compact_mode_request = 0.0
+var wants_compact_mode : bool = false :
+	set(p_value):
+		if (p_value != wants_compact_mode):
+			_time_since_compact_mode_request = 0.0
+		wants_compact_mode = p_value
+
+signal playback_state_changed(current_state: bool, current_track: int)
+
+
+func _ready() -> void:
+	playlist_tree.columns = 3
+	playlist_tree.set_column_title(0, \"#\")
+	playlist_tree.set_column_expand(0, false)
+	playlist_tree.set_column_title(1, \"Artist\")
+	playlist_tree.set_column_title(2, \"Title\")
+	playlist_tree.set_column_expand(2, true)
+	
+	assert(playlist)
+	
+	_playlist_root = playlist_tree.create_item()
+	assert(_playlist_root)
+	
+	for i in len(playlist.tracks):
+		var entry = playlist.tracks[i]
+		var tree_entry = playlist_tree.create_item(_playlist_root)
+		tree_entry.set_meta(\"id\", i)
+		tree_entry.set_text(0, str(i))
+		tree_entry.set_text(1, entry.artist)
+		tree_entry.set_text(2, entry.title)
+	
+	playback_state_changed.connect(
+	func(p_is_playing, p_active_track):
+		print(p_is_playing)
+		%PlayPauseBtn.icon = preload(\"res://icons/white_pause.png\") if p_is_playing else preload(\"res://icons/white_play.png\")
+		%ArtistLabel.text = playlist.tracks[p_active_track].artist
+		%TitleLabel.text = playlist.tracks[p_active_track].title
+	)
+	
+	%PlayPauseBtn.pressed.connect(
+	func():
+		if %InternalPlayer.playing:
+			set_meta(\"cached_playback_position\", %InternalPlayer.get_playback_position())
+			%InternalPlayer.playing = false
+		else:
+			var position = get_meta(\"cached_playback_position\", 0.0)
+			remove_meta(\"cached_playback_position\")
+			%InternalPlayer.play(position)
+		
+		playback_state_changed.emit(is_playing, active_track)
+	)
+	
+	playlist_tree.item_activated.connect(
+	func():
+		var item = playlist_tree.get_selected()
+		var next_song = item.get_meta(\"id\", 0)
+		play(next_song)
+	)
+	
+	play_pause_button.focus_entered.connect(
+	func():
+		wants_compact_mode = true
+	)
+	
+	playlist_tree.focus_entered.connect(
+	func():
+		wants_compact_mode = false
+	)
+	
+	if active_track < 0 or active_track >= len(playlist.tracks):
+		play(randi_range(0, len(playlist.tracks) - 1))
+	
+	play_pause_button.grab_focus()
+
+
+func _process(delta: float) -> void:
+	if is_playing:
+		%ProgressBar.value = %InternalPlayer.get_playback_position()
+		%ProgressBar.max_value = playlist.tracks[active_track].audio_stream.get_length()
+		var position_minutes = %InternalPlayer.get_playback_position() / 60.0
+		var position_seconds = fmod(%InternalPlayer.get_playback_position(), 60.0)
+		
+		var total_minutes = playlist.tracks[active_track].audio_stream.get_length() / 60.0
+		var total_seconds = fmod(playlist.tracks[active_track].audio_stream.get_length(), 60.0)
+		
+		%RuntimeLabel.text = \"%02d:%02d / %02d:%02d\" % [int(position_minutes), int(position_seconds), int(total_minutes), int(total_seconds)]
+	
+	_time_since_compact_mode_request += delta
+	if _time_since_compact_mode_request > (2.0 if wants_compact_mode else 0.125):
+		compact_mode = wants_compact_mode
+	
+
+
+func play(p_index : int):
+	assert(p_index >= 0)
+	assert(p_index < len(playlist.tracks))
+	var change := active_track != p_index
+	remove_meta(\"cached_playback_position\")
+	if (change):
+		%InternalPlayer.stop()
+		%InternalPlayer.stream = playlist.tracks[p_index].audio_stream
+	
+	%InternalPlayer.play()
+	active_track = p_index
+"
+
+[node name="Player" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_ekvwq")
+playlist = ExtResource("1_8max0")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 16.0
+offset_right = -32.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(-64, -32)
+
+[node name="VSplitContainer" type="VSplitContainer" parent="MarginContainer"]
+layout_mode = 2
+split_offset = 100
+dragger_visibility = 1
+
+[node name="Panel" type="Panel" parent="MarginContainer/VSplitContainer"]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AlbumCover" type="TextureRect" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.1
+texture = ExtResource("1_6tkye")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 6
+text = "%SongTitle%"
+
+[node name="ArtistLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 6
+text = "%Artist%"
+
+[node name="Transport" type="Panel" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PlayPauseBtn" type="Button" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+icon = ExtResource("2_gaxe7")
+expand_icon = true
+
+[node name="ProgressBar" type="ProgressBar" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+rounded = true
+show_percentage = false
+
+[node name="RuntimeLabel" type="Label" parent="MarginContainer/VSplitContainer/Panel/HBoxContainer/VBoxContainer/Transport/HBoxContainer/ProgressBar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_vertical = 8
+text = "%time%/%totaltime%"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Panel2" type="Panel" parent="MarginContainer/VSplitContainer"]
+layout_mode = 2
+
+[node name="PlaylistTree" type="Tree" parent="MarginContainer/VSplitContainer/Panel2"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+column_titles_visible = true
+hide_root = true
+select_mode = 1
+
+[node name="InternalPlayer" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
